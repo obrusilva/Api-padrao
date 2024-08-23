@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Padrao.Api.Configuration;
 using Padrao.APi.Configuration;
@@ -14,11 +15,9 @@ using Padrao.Domain.Virtual;
 using Padrao.Service.Interface;
 using Padrao.Service.Services;
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.Json;
-using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -58,12 +57,25 @@ builder.Services.Configure<AppToken>(appTokenSection);
 builder.Services.Configure<RequestLocalizationOptions>(options =>
 {
     options.DefaultRequestCulture = new RequestCulture("pt-BR");
-    options.SupportedCultures = new List<CultureInfo> { new CultureInfo("pt-BR") };
+    options.SupportedCultures = [new("pt-BR")];
 });
+
 
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddRateLimitingConfig();
+
+
+
+//builder.Services.AddDistributedMemoryCache(); //em memoria
+builder.Services.AddStackExchangeRedisOutputCache(options =>
+{
+    options.Configuration = builder.Configuration.GetConnectionString("Redis");
+    options.InstanceName = "ApiPadrao";
+}); // redis
+
+builder.Services.AddOutputCache();
+
 
 builder.Services.AddScoped<IResponse, Response>();
 builder.Services.AddScoped<DataContext, DataContext>();
@@ -71,6 +83,7 @@ builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
 builder.Services.AddScoped<IUser, UserAuthenticated>();
 builder.Services.AddScoped<IUsersService, UsersService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IExamplesService, ExamplesService>();
 builder.Services.AddSwaggerConfiguration();
 
 
@@ -87,7 +100,7 @@ app.UseCors(x => x
 );
 
 app.UseRateLimiter();
-
+app.UseOutputCache();
 app.UseEndpoints(endpoints => { _ = endpoints.MapControllers(); });
 
 app.UseResponseCompression();
